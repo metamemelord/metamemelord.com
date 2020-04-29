@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"io"
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -37,4 +39,31 @@ func getWordpressPostbyIDHandler(c *gin.Context) {
 		wpData := worker.GetData().WordpressData
 		c.JSON(http.StatusOK, wpData[len(wpData)-pid])
 	}
+}
+
+func getWordpressWebpage(c *gin.Context) {
+	path := c.Param("path")
+	log.Println(path)
+	baseWordpressPath := "https://theanonymosopher.wordpress.com"
+
+	finalPath := baseWordpressPath + path
+	req, _ := http.NewRequest(http.MethodGet, finalPath, nil)
+	req.Header = c.Request.Header.Clone()
+
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("[Error]", err)
+		c.Redirect(302, "/error")
+	}
+	defer resp.Body.Close()
+
+	for k, v := range resp.Header {
+		if strings.ToLower(k) == "cache-control" {
+			c.Header(k, "no-cache, must-revalidate, max-age=0")
+			continue
+		}
+		c.Header(k, v[0])
+	}
+	io.Copy(c.Writer, resp.Body)
 }
